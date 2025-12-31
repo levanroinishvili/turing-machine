@@ -1,0 +1,1189 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Post Automaton</title>
+<link rel="shortcut icon" href="icecream.ico">
+<STYLE TYPE="text/css" MEDIA=screen>
+<!--
+  .command { border:1px #dddddd solid;}
+-->
+</STYLE>
+<script language="javascript" type="text/javascript">
+var tapeLength = 51, maxCommands = 100;
+var headPositionInitial = Math.floor(tapeLength/2) + 1 ;
+var tapeStack = new Array;
+
+var headPosition, runningProgram, pauseRequested, stopRequested, nextCommand, nextCommandTimerID, timerIsOn;
+function startpost() {
+	runningProgram = false;
+	pauseRequested = false;
+	stopRequested = false;
+	nextCommand = 1;
+	headPosition = setHeadPositionValue(headPositionInitial);
+	headPosition.src = "3head.gif";
+	document.postautomaton.command1.focus();
+}
+function getHeadPositionValue() {
+	return (Number(headPosition.id.substr(6)));
+}
+function setHeadPositionValue(i) {
+	return(document.getElementById("header"+i));
+}
+function sethead(newposition) {
+	if ( newposition !== headPosition ) {
+		headPosition.src = "2.gif";
+		newposition.src = "3head.gif";
+		headPosition = newposition;
+	}
+}
+function swap(node) {
+	if (Right(node.src,5) == "0.gif") node.src = "1"+Math.floor(5*Math.random()+1) +".gif"; else node.src = "0.gif";
+}
+function writeToTape(token,position) {
+	if ( token==1 )
+		document.getElementById('tape'+position).src = "1"+Math.floor(5*Math.random()+1) +".gif";
+	else
+		document.getElementById('tape'+position).src = "0.gif";	
+}
+function postevaluate(position) {
+	if (Right(document.getElementById("tape"+position).src,5) == "0.gif") return(false); else return(true);
+}
+function requestRunProgram() {
+	if ( runningProgram && ! pauseRequested ) requestPauseProgram();
+	else runProgramFinalize();
+}
+function runProgramFinalize() {
+	var buttonPlay = document.getElementById("buttonPlay");
+	buttonPlay.src="buttonPause.png";
+	runningProgram = true;
+	pauseRequested = false;
+	stopRequested = false;
+	highlightCommand(nextCommand);
+	timerIsOn = true ;
+	nextCommandTimerID = window.setTimeout('scheduleNextCommand()',document.postautomaton.speed.value);
+}
+function requestPauseProgram() {
+	if ( ! runningProgram ) return;
+	pauseRequested = true;
+	pauseProgramFinalize();
+}
+function requestStopProgram() {
+	if ( ! runningProgram ) {
+		nextCommand = 1;
+		return;
+	}
+	stopRequested = true;
+	stopProgramFinalize();
+}
+function stopProgramFinalize() {
+	var buttonPlay = document.getElementById("buttonPlay");
+	if ( timerIsOn ) { timerIsOn=false; clearTimeout(nextCommandTimerID); }
+	buttonPlay.src="buttonPlay.png";
+	runningProgram = false;
+	pauseRequested = false;
+	stopRequested = false;
+	dehighlightCommand(nextCommand);
+	nextCommand = 1;
+}
+function pauseProgramFinalize() {
+	var buttonPlay = document.getElementById("buttonPlay");
+	if ( timerIsOn ) { timerIsOn=false; clearTimeout(nextCommandTimerID); }
+	buttonPlay.src="buttonPlay.png";
+	// runningProgram = false;
+	// pauseRequested = false;
+	// stopRequested = false;
+}
+function highlightCommand(i) {
+	var commandBox = document.getElementById("command"+i);
+	if ( i <= maxCommands ) commandBox.style.border = "1px #dd4040 solid";
+}
+function dehighlightCommand(i) {
+	var commandBox = document.getElementById("command"+i);
+	if ( i <= maxCommands ) commandBox.style.border = "1px #dddddd solid";
+}
+function executeNextCommand() {
+	dehighlightCommand(nextCommand);
+
+	if ( nextCommand > maxCommands ) {
+		alert("Cannot execute command " + nextCommand);
+		stopProgramFinalize();
+		return;
+	}
+	var com = parseCommand(getCommandText(nextCommand));
+	directive = com[0];
+	next1 = com[1]; next2 = com[2];
+	error = com[3]; errorText = com[4];
+
+	if ( error != 0 ) {
+		alert (errorText);
+		stopProgramFinalize();
+		return;
+	}
+	switch ( directive ) {
+		case '*':
+			// The directive seems to be a comment; therefore do nothing
+			nextCommand = next1;
+			break;
+		case 'L':
+			var p = getHeadPositionValue();
+			if ( p > 1 ) {
+				p = p - 1;
+				sethead(setHeadPositionValue(p));
+			} else {
+				alert ("Sorry, end of reel was reached.");
+				stopProgramFinalize();
+				return;
+			}
+			nextCommand = next1;
+			break;	
+		case 'R':
+			var p = getHeadPositionValue();
+			if ( p < tapeLength ) {
+				p = p + 1;
+				sethead(setHeadPositionValue(p));
+			} else {
+				alert ("Sorry, end of reel was reached.");
+				stopProgramFinalize();
+				return;
+			}
+			nextCommand = next1;
+			break;
+		case '0':
+			if ( postevaluate(getHeadPositionValue()) ) {
+				writeToTape(0,getHeadPositionValue());
+				headPosition.src='3headEraze.gif';
+			} else {
+				alert ('Cannot clear this position.\n\nThe position is already empty.');
+				stopProgramFinalize();
+				return;
+			}
+			nextCommand = next1;
+			break;
+		case '1':
+			if ( ! postevaluate(getHeadPositionValue()) ) {
+				writeToTape(1,getHeadPositionValue());
+				headPosition.src='3headWrite.gif';
+			} else {
+				alert ('Cannot write at this position.\n\nThe position is already written.');
+				stopProgramFinalize();
+				return;
+			}
+			nextCommand = next1;
+			break;
+		case 'E':
+			if ( postevaluate(getHeadPositionValue()) )	nextCommand = next1; else nextCommand = next2;
+			break;
+		case 'STOP':
+			//alert ('"Stop" directive reached.\n\nProgram execution completed.');
+			stopProgramFinalize();
+			return;
+	}
+	highlightCommand(nextCommand);
+
+}
+function scheduleNextCommand() {
+	executeNextCommand();
+	if ( runningProgram && !pauseRequested && !stopRequested ) {
+		nextCommandTimerID = window.setTimeout('scheduleNextCommand()',document.postautomaton.speed.value);
+		timerIsOn = true ;
+	}
+}
+function getCommandText(i) {
+	return ( document.getElementById("command"+i).value );
+}
+
+
+function parseCommand(c) {
+	// Returns directive, next1, next2, Error_Code, Error_Text
+	var directive, next1, next2, error, errorText ;
+	directive = ""; next1 = 0; next2 = 0;
+	error = 0;
+	errorText = "";
+	c = TrimAll(c);
+	var word, w;
+	if ( c.substr(0,1)=='*' ) {
+		// Directive appears to be a comment
+		word=[];
+		w = '*';
+	} else {
+		word = c.split(/-/g);
+		if ( word.length > 3 ) {
+			error = 1; errorText = 'Too many dashes' ;
+		}
+		w = word[0].toString().toUpperCase() ;
+	}
+	if ( w=='*' ) directive = '*';
+	else if ( w=='L' || w=='LE' || w=='LEF' || w=='LEFT' ) directive = 'L';
+	else if ( w=='R' || w=='RI' || w=='RIG' || w=='RIGH' || w=='RIGHT' ) directive = 'R';
+	else if ( w=='E' || w=='EV' || w=='EVA' || w=='EVAL' || w=='EVALU' || w=='EVALUA' || w=='EVALUAT' || w=='EVALUATE' ) directive = 'E';
+	else if ( w=='S' || w=='ST' || w=='STO' || w=='STOP' ) directive = 'STOP';
+	else if ( w=='1' ) directive = '1';
+	else if ( w=='0' ) directive = '0';
+	else if ( w=='' ) {
+		error = -1; errorText='Command line is empty.';
+	} else {
+		error = 1; errorText='Directive "' + w + '" not recognized.';
+	}
+	if ( directive!='*' && word.length == 0 ) {
+		error = -1; errorText = 'Command is empty' ;
+	}
+	if ( directive=='*' || word.length == 1 ) {
+		next1 = nextCommand + 1;
+		next2 = next1;
+	} else if ( word.length == 2 ) {
+		if ( isUnsignedInteger(word[1]) ) {
+			next1 = Number(word[1]);
+			next2 = next1;
+		} else {
+			next1 = 0; next2 = 0;
+			error = 1;
+			if ( errorText != '' ) errorText = errorText + "\n";
+			errorText = errorText + '"' + word[1] + '" is not an integer.';
+		}
+	} else if ( word.length>0 ) {	
+		if ( directive=='L' || directive=='R' || directive=='STOP' ) {
+			error = 1;
+			if ( errorText != '' ) errorText = errorText + "\n";
+			errorText = errorText + 'The "' + directive + '" instruction cannot have two GoTO addresses.';
+		}
+		// Parse first goto address
+		if ( isUnsignedInteger(word[1]) ) {
+			next1 = Number(word[1]);
+		} else {
+			next1 = 0;
+			error = 1;
+			if ( errorText != '' ) errorText = errorText + "\n";
+			errorText = errorText + '"'+ word[1] + '" is not an integer.';
+		}
+		// Parse second goto address
+		if ( isUnsignedInteger(word[2]) ) {
+			next2 = Number(word[2]);
+		} else {
+			next2 = 0;
+			error = 1;
+			if ( errorText != '' ) errorText = errorText + "\n";
+			errorText = errorText + '"' + word[2] + '" is not an integer.';	
+		}
+
+	}
+	return (Array(directive, next1, next2, error, errorText));
+} // End of function parseCommand()
+
+
+function checkCommand(cominput) {
+	var directive, next1, next2, error, errorText ;
+	cominput.value = Trim(cominput.value);
+	if ( cominput.value.substr(0,1) == '*' ) return;
+	cominput.value = cominput.value.replace(/(\s|\-)+/g,'-').toUpperCase();
+	var com = parseCommand(cominput.value);
+	directive = com[0];
+	next1 = com[1]; next2 = com[2];
+	error = com[3]; errorText = com[4];
+	if ( error > 0 ) {
+		alert(errorText);
+	}
+	if ( cominput.value == '' )
+		document.getElementById('n'+cominput.id.substr(7)).style.color="#d0d0d0";
+	else document.getElementById('n'+cominput.id.substr(7)).style.color="black";
+
+}
+function commandEntry(cominput,e) {
+	var keynum;
+	if(window.event) // IE
+		keynum = e.keyCode;
+	else if(e.which) // Netscape/Firefox/Opera
+		keynum = e.which;
+	switch (keynum) {
+		case 13: // Enter
+		case 40: // Down
+			line = Number(cominput.id.substr(7));
+			if ( line < maxCommands ) line = line + 1;
+			document.getElementById('command'+line).focus();
+			break;
+		case 38: // Up
+			line = Number(cominput.id.substr(7));
+			if ( line > 1 ) line = line - 1;
+			document.getElementById('command'+line).focus();
+			break;
+		default:
+	}
+}
+function clearTape() {
+	if ( ! confirm('Clear the tape?') ) return;
+	for ( i=1; i<=tapeLength; i++)
+		document.getElementById('tape'+i).src = "0.gif";
+}
+function saveTape() {
+	var tapeClear=true;
+	for ( i=1; i<=tapeLength; i++) {
+		if (Right(document.getElementById("tape"+i).src,5) != "0.gif") tapeClear=false;
+	}
+	if ( tapeClear ) return;
+	var t = '';
+	for ( i=1; i<=tapeLength; i++) {
+		if (Right(document.getElementById("tape"+i).src,5) == "0.gif") t = t + '0'; else t = t + '1';
+	}
+	if ( tapeStack.length==0 || tapeStack[tapeStack.length-1] != t ) tapeStack.push(t);
+}
+function retoreTape() {
+	if ( tapeStack.length == 0 ) {
+		alert("Nothing to restore");
+		return;
+	}
+	var t = tapeStack.pop();
+	for (i=0;i<tapeLength;i++) {
+		writeToTape(t.substr(i,1),i+1);
+	}
+}
+function clearProgram() {
+	for (i=1;i<=maxCommands;i++) {
+		document.getElementById('command'+i).value='';
+		if (i==1) document.getElementById('n'+i).style.color="black";
+		else document.getElementById('n'+i).style.color="#d0d0d0";
+	}
+	document.getElementById('command1').focus();
+}
+function TapeStackPreviewShow() {
+	if (tapeStack.length==0) return;
+	var newhtml = '<table border="0" cellspacing="0" cellpadding="0">';
+	for (i=tapeStack.length-1;i>=0;i--) {
+		newhtml=newhtml+'<tr>';
+		for (j=0;j<tapeLength;j++) {
+			newhtml = newhtml+'<td><img src="';
+			if (tapeStack[i].substr(j,1)=='1') newhtml=newhtml+'1'+Math.floor(5*Math.random()+1) ; else newhtml=newhtml+'0';
+			newhtml=newhtml+'.gif"></td>';
+		}
+		newhtml = newhtml + '</tr>\n'
+	}
+	newhtml = newhtml + '</table>';
+	document.getElementById('tapeStackPreview').innerHTML = newhtml;
+	document.getElementById('tapeStackPreview').style.visibility='visible';
+}
+function TapeStackPreviewHide() {
+	document.getElementById('tapeStackPreview').style.visibility='hidden';
+}
+function saveProgram() {
+	var programText = '';
+
+	for (i=1;i<=maxCommands;i++) {
+		commandText = Trim(document.getElementById('command'+i).value);
+		if ( commandText.substr(0,1)!='*' ) commandText = TrimAll(commandText);
+		if ( commandText != '' ) {
+			if ( programText != '' ) programText = programText + '\n' ;
+			programText = programText + i + ':' + commandText ;
+			
+		}
+	}
+	if ( programText == '' ) {
+		alert ("Nothing to export!");
+	} else {
+		saveWindow = window.open('','','menubar=1,resizable=1,width=350,height=700,location=0,status=0,scrollbars=1');
+		saveWindow.document.write("<html><head><title>Save Program</title></head><body><pre>"+programText+"</pre></body></html>");
+	}
+}
+function loadProgram() {
+	var programText = '' ;
+	for (i=1;i<=maxCommands;i++) {
+		programText = programText + document.getElementById('command'+i).value;
+	}
+	if ( programText!='' && ! confirm("This will discard currnet program\n\nContinue?") ) return;
+	document.getElementById("loadProgramFrame").style.visibility="visible";
+	document.programLoader.programToLoad.focus();
+}
+function loadProgramHide() {
+	document.getElementById("loadProgramFrame").style.visibility="hidden";
+}
+function showhelp() {
+	helpWindow = window.open('programminghelp.html','Help','menubar=0,resizable=1,width=500,height=400,location=0,status=0,scrollbars=1');
+}
+function commandToolbarShow(i) {
+	document.getElementById('commandtoolbar'+i).style.visibility="visible";
+}
+function commandToolbarHide(i) {
+	document.getElementById('commandtoolbar'+i).style.visibility="hidden";
+}
+function deleteThisLine(i) {
+	if ( Trim(document.getElementById('command'+i).value)!='' && ! confirm("Delete line "+i+"?") )  return;
+	var comt, m;
+	for (j=1;j<maxCommands;j++) {
+		if ( j>=i ) comt = document.getElementById('command'+(j+1)).value;
+		else comt = document.getElementById('command'+j).value;
+		if ( Trim(comt).substr(0,1)=='*' )
+			document.getElementById('command'+j).value = comt ;
+		else {
+			var chunk = comt.split(/(\d+)/);
+			for (m in chunk)
+				if ( ( chunk[0]!='' || m>1 ) && isUnsignedInteger(chunk[m]) && chunk[m]>i) chunk[m] = Number(chunk[m]) - 1 ;
+			document.getElementById('command'+j).value = chunk.join('');
+		}
+		if ( TrimAll(document.getElementById('command'+j).value) == '' )
+			document.getElementById('n'+j).style.color="#d0d0d0";
+		else
+			document.getElementById('n'+j).style.color="black";
+	}
+	document.getElementById('command'+maxCommands).value='';
+	document.getElementById('n'+maxCommands).style.color="#d0d0d0";
+}
+function insertEmptyLineAbove(i) {
+	if ( Trim(document.getElementById('command'+maxCommands).value)!='' && ! confirm("This will delete the last directive:\n\n"+maxCommands+document.getElementById('command'+maxCommands).value+"\n\nContinue anyway?") )  return;
+	var comt, m;
+	for (j=maxCommands;j>=1;j--) {
+		if ( j==i ) continue;
+		else if ( j>i ) comt = document.getElementById('command'+(j-1)).value;
+		else comt = document.getElementById('command'+j).value;
+		if ( Trim(comt).substr(0,1)=='*' )
+			document.getElementById('command'+j).value = comt ;
+		else {
+			var chunk = comt.split(/(\d+)/);
+			for (m in chunk)
+				if ( ( chunk[0]!='' || m>1 ) && isUnsignedInteger(chunk[m]) && chunk[m]>=i ) chunk[m] = Number(chunk[m]) + 1 ;
+			document.getElementById('command'+j).value = chunk.join('');
+		}
+		if ( TrimAll(document.getElementById('command'+j).value) == '' )
+			document.getElementById('n'+j).style.color="#d0d0d0";
+		else
+			document.getElementById('n'+j).style.color="black";
+	}
+	document.getElementById('command'+i).value='';
+	document.getElementById('n'+i).style.color="#d0d0d0";
+}
+function breakStringNumbers(s) {
+	return (s.split(/(\d+)/));
+}
+function test() {
+	var x,x1='';
+	x = breakStringNumbers("a-1234-57-89");
+	for (i in x) {
+		x1 = x1 + '\n'+ x[i];
+	}
+	alert(x1);
+}
+</script>
+<script language="javascript" type="text/javascript">
+function Left(str, n){
+	if (n <= 0)
+	    return "";
+	else if (n > String(str).length)
+	    return str;
+	else
+	    return String(str).substring(0,n);
+}
+function Right(str, n){
+    if (n <= 0)
+       return "";
+    else if (n > String(str).length)
+       return str;
+    else {
+       var iLen = String(str).length;
+       return String(str).substring(iLen, iLen - n);
+    }
+}
+function TrimAll(stringToTrim) {
+	return stringToTrim.replace(/\s+/g,"");
+}
+function Trim(stringToTrim) {
+	return stringToTrim.replace(/^\s+|\s+$/g,"");
+}
+function LTrim(stringToTrim) {
+	return stringToTrim.replace(/^\s+/,"");
+}
+function RTrim(stringToTrim) {
+	return stringToTrim.replace(/\s+$/,"");
+}
+function isUnsignedInteger(s) {
+  return (s.toString().search(/^[0-9]+$/) == 0);
+}
+</script>
+</head>
+
+<body onload="startpost()">
+<form name="postautomaton">
+<table border="0" align="center" cellpadding="0" cellspacing="0" title="Click on frame to toggle. Click on new cursor position to move cursor.">
+  <tr>
+    <td>&nbsp;</td>
+    <td><img src="2.gif" border="0" name="header1" id="header1" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header2" id="header2" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header3" id="header3" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header4" id="header4" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header5" id="header5" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header6" id="header6" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header7" id="header7" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header8" id="header8" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header9" id="header9" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header10" id="header10" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header11" id="header11" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header12" id="header12" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header13" id="header13" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header14" id="header14" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header15" id="header15" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header16" id="header16" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header17" id="header17" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header18" id="header18" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header19" id="header19" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header20" id="header20" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header21" id="header21" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header22" id="header22" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header23" id="header23" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header24" id="header24" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header25" id="header25" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header26" id="header26" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header27" id="header27" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header28" id="header28" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header29" id="header29" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header30" id="header30" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header31" id="header31" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header32" id="header32" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header33" id="header33" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header34" id="header34" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header35" id="header35" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header36" id="header36" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header37" id="header37" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header38" id="header38" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header39" id="header39" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header40" id="header40" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header41" id="header41" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header42" id="header42" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header43" id="header43" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header44" id="header44" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header45" id="header45" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header46" id="header46" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header47" id="header47" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header48" id="header48" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header49" id="header49" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header50" id="header50" onclick="sethead(this)" /></td>
+    <td><img src="2.gif" border="0" name="header51" id="header51" onclick="sethead(this)" /></td>
+    <td>&nbsp;</td>
+  </tr>
+  <tr>
+    <td><img src="buttonSave.png" width="30" alt="Save the Tape" title="Save the Tape" onclick="saveTape()" /><br /><img src="buttonLoad.png" width="30" alt="Restore the tape" title="Restore the tape" onclick="TapeStackPreviewHide();retoreTape()" onmouseover="TapeStackPreviewShow()" onmouseout="TapeStackPreviewHide()" /></td>
+    <td><img src="0.gif" border="0" name="tape1" id="tape1" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape2" id="tape2" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape3" id="tape3" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape4" id="tape4" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape5" id="tape5" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape6" id="tape6" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape7" id="tape7" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape8" id="tape8" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape9" id="tape9" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape10" id="tape10" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape11" id="tape11" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape12" id="tape12" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape13" id="tape13" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape14" id="tape14" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape15" id="tape15" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape16" id="tape16" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape17" id="tape17" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape18" id="tape18" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape19" id="tape19" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape20" id="tape20" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape21" id="tape21" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape22" id="tape22" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape23" id="tape23" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape24" id="tape24" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape25" id="tape25" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape26" id="tape26" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape27" id="tape27" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape28" id="tape28" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape29" id="tape29" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape30" id="tape30" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape31" id="tape31" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape32" id="tape32" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape33" id="tape33" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape34" id="tape34" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape35" id="tape35" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape36" id="tape36" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape37" id="tape37" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape38" id="tape38" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape39" id="tape39" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape40" id="tape40" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape41" id="tape41" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape42" id="tape42" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape43" id="tape43" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape44" id="tape44" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape45" id="tape45" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape46" id="tape46" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape47" id="tape47" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape48" id="tape48" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape49" id="tape49" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape50" id="tape50" onclick="swap(this)" /></td>
+    <td><img src="0.gif" border="0" name="tape51" id="tape51" onclick="swap(this)" /></td>
+    <td valign="middle"><img src="buttonDelete.png" width="30" alt="Clear Tape" title="Clear Tape" onclick="clearTape()" /></td>
+  </tr>
+  <tr>
+    <td>&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top"><img src="dotBrown.gif" /></td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top"><img src="dotBlue.gif" /></td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top"><img src="dotGreen.gif" /></td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top"><img src="dotGrey.gif" /></td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top"><img src="dotRed.gif" /></td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+    <td align="center" valign="top">&nbsp;</td>
+  </tr>
+</table>
+<div style="text-align:center">
+<div id="tapeStackPreview" style="visibility:hidden;z-index: 2; position: absolute; background-color:#FFF;border:1px solid #303030"></div></div>
+<p>&nbsp;</p>
+<table border="0" align="center" cellpadding="0" cellspacing="0">
+  <tr>
+    <td height="50" valign="top">&nbsp;</td><td>&nbsp;</td>
+    <td height="50" colspan="8" valign="top"><table cellpadding="0" cellspacing="0"><tr><td><img src="buttonPlay.png" title="Play / Pause" name="buttonPlay" width="30" id="buttonPlay" onclick="requestRunProgram()"/><img src="buttonStop.png" title="Stop" width="30" onclick="requestStopProgram()" /><img src="buttonNext.png" title="Next Step" width="30" onclick="executeNextCommand()" /></td><td>&nbsp;</td><td>Speed <select name="speed" id="speed" title="Select programme execution speed">
+      <option value="0">Fastest</option>
+      <option value="100">Faster</option>
+      <option value="500">Fast</option>
+      <option value="1000" selected="selected">Normal</option>
+      <option value="3000">Slow</option>
+      <option value="50000">Slower</option>
+      <option value="10000">Slowest</option>
+    </select></td></tr></table></td>
+    <td colspan="9" valign="top" align="right"><img src="buttonHelp.png" width="30" alt="Help with Program Syntax" title="Help with Program Syntax" onclick="showhelp()" /><img src="buttonSave.png" width="30" alt="Save / Export Program" title="Save / Export Program" onclick="saveProgram()" /><img src="buttonLoad.png" width="30" alt="Load / Import Program" title="Load / Import Program" onclick="loadProgram()" />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="buttonDelete.png" width="30" alt="Clear Program" title="Clear Program" onclick="if ( confirm('Clear the program?') ) clearProgram()" /></td>
+    </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(1)" onmouseout="commandToolbarHide(1)"><div id="commandtoolbar1" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(1)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(1)" /></div></td>
+    <td align="right" style="color:black" id="n1">1</td>
+    <td><input name="command1" type="text" class="command" id="command1" tabindex="1" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td width="30">&nbsp;</td>
+    <td onmouseover="commandToolbarShow(21)" onmouseout="commandToolbarHide(21)"><div id="commandtoolbar21" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(21)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(21)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n21">21</td>
+    <td><input name="command21" id="command21" tabindex="21" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td width="30">&nbsp;</td>
+    <td onmouseover="commandToolbarShow(41)" onmouseout="commandToolbarHide(41)"><div id="commandtoolbar41" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(41)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(41)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n41">41</td>
+    <td><input name="command41" id="command41" tabindex="41" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td width="30">&nbsp;</td>
+    <td onmouseover="commandToolbarShow(61)" onmouseout="commandToolbarHide(61)"><div id="commandtoolbar61" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(61)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(61)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n61">61</td>
+    <td><input name="command61" id="command61" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td width="30">&nbsp;</td>
+    <td onmouseover="commandToolbarShow(81)" onmouseout="commandToolbarHide(81)"><div id="commandtoolbar81" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(81)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(81)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n81">81</td>
+    <td><input name="command81" id="command81" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(2)" onmouseout="commandToolbarHide(2)"><div id="commandtoolbar2" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(2)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(2)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n2">2</td>
+    <td><input name="command2" type="text" class="command" id="command2" tabindex="2" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(22)" onmouseout="commandToolbarHide(22)"><div id="commandtoolbar22" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(22)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(22)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n22">22</td>
+    <td><input name="command22" id="command22" tabindex="22" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(42)" onmouseout="commandToolbarHide(42)"><div id="commandtoolbar42" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(42)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(42)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n42">42</td>
+    <td><input name="command42" id="command42" tabindex="42" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(62)" onmouseout="commandToolbarHide(62)"><div id="commandtoolbar62" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(62)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(62)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n62">62</td>
+    <td><input name="command62" id="command62" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(82)" onmouseout="commandToolbarHide(82)"><div id="commandtoolbar82" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(82)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(82)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n82">82</td>
+    <td><input name="command82" id="command82" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(3)" onmouseout="commandToolbarHide(3)"><div id="commandtoolbar3" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(3)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(3)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n3">3</td>
+    <td><input name="command3" type="text" class="command" id="command3" tabindex="3" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(23)" onmouseout="commandToolbarHide(23)"><div id="commandtoolbar23" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(23)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(23)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n23">23</td>
+    <td><input name="command23" id="command23" tabindex="23" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(43)" onmouseout="commandToolbarHide(43)"><div id="commandtoolbar43" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(43)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(43)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n43">43</td>
+    <td><input name="command43" id="command43" tabindex="43" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(63)" onmouseout="commandToolbarHide(63)"><div id="commandtoolbar63" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(63)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(63)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n63">63</td>
+    <td><input name="command63" id="command63" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(83)" onmouseout="commandToolbarHide(83)"><div id="commandtoolbar83" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(83)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(83)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n83">83</td>
+    <td><input name="command83" id="command83" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(4)" onmouseout="commandToolbarHide(4)"><div id="commandtoolbar4" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(4)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(4)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n4">4</td>
+    <td><input name="command4" type="text" class="command" id="command4" tabindex="4" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(24)" onmouseout="commandToolbarHide(24)"><div id="commandtoolbar24" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(24)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(24)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n24">24</td>
+    <td><input name="command24" id="command24" tabindex="24" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(44)" onmouseout="commandToolbarHide(44)"><div id="commandtoolbar44" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(44)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(44)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n44">44</td>
+    <td><input name="command44" id="command44" tabindex="44" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(64)" onmouseout="commandToolbarHide(64)"><div id="commandtoolbar64" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(64)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(64)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n64">64</td>
+    <td><input name="command64" id="command64" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(84)" onmouseout="commandToolbarHide(84)"><div id="commandtoolbar84" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(84)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(84)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n84">84</td>
+    <td><input name="command84" id="command84" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(5)" onmouseout="commandToolbarHide(5)"><div id="commandtoolbar5" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(5)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(5)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n5">5</td>
+    <td><input name="command5" type="text" class="command" id="command5" tabindex="5" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(25)" onmouseout="commandToolbarHide(25)"><div id="commandtoolbar25" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(25)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(25)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n25">25</td>
+    <td><input name="command25" id="command25" tabindex="25" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(45)" onmouseout="commandToolbarHide(45)"><div id="commandtoolbar45" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(45)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(45)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n45">45</td>
+    <td><input name="command45" id="command45" tabindex="45" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(65)" onmouseout="commandToolbarHide(65)"><div id="commandtoolbar65" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(65)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(65)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n65">65</td>
+    <td><input name="command65" id="command65" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(85)" onmouseout="commandToolbarHide(85)"><div id="commandtoolbar85" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(85)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(85)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n85">85</td>
+    <td><input name="command85" id="command85" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(6)" onmouseout="commandToolbarHide(6)"><div id="commandtoolbar6" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(6)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(6)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n6">6</td>
+    <td><input name="command6" type="text" class="command" id="command6" tabindex="6" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(26)" onmouseout="commandToolbarHide(26)"><div id="commandtoolbar26" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(26)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(26)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n26">26</td>
+    <td><input name="command26" id="command26" tabindex="26" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(46)" onmouseout="commandToolbarHide(46)"><div id="commandtoolbar46" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(46)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(46)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n46">46</td>
+    <td><input name="command46" id="command46" tabindex="46" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(66)" onmouseout="commandToolbarHide(66)"><div id="commandtoolbar66" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(66)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(66)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n66">66</td>
+    <td><input name="command66" id="command66" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(86)" onmouseout="commandToolbarHide(86)"><div id="commandtoolbar86" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(86)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(86)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n86">86</td>
+    <td><input name="command86" id="command86" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(7)" onmouseout="commandToolbarHide(7)"><div id="commandtoolbar7" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(7)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(7)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n7">7</td>
+    <td><input name="command7" type="text" class="command" id="command7" tabindex="7" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(27)" onmouseout="commandToolbarHide(27)"><div id="commandtoolbar27" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(27)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(27)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n27">27</td>
+    <td><input name="command27" id="command27" tabindex="27" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(47)" onmouseout="commandToolbarHide(47)"><div id="commandtoolbar47" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(47)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(47)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n47">47</td>
+    <td><input name="command47" id="command47" tabindex="47" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(67)" onmouseout="commandToolbarHide(67)"><div id="commandtoolbar67" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(67)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(67)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n67">67</td>
+    <td><input name="command67" id="command67" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(87)" onmouseout="commandToolbarHide(87)"><div id="commandtoolbar87" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(87)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(87)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n87">87</td>
+    <td><input name="command87" id="command87" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(8)" onmouseout="commandToolbarHide(8)"><div id="commandtoolbar8" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(8)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(8)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n8">8</td>
+    <td><input name="command8" type="text" class="command" id="command8" tabindex="8" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(28)" onmouseout="commandToolbarHide(28)"><div id="commandtoolbar28" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(28)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(28)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n28">28</td>
+    <td><input name="command28" id="command28" tabindex="28" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(48)" onmouseout="commandToolbarHide(48)"><div id="commandtoolbar48" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(48)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(48)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n48">48</td>
+    <td><input name="command48" id="command48" tabindex="48" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(68)" onmouseout="commandToolbarHide(68)"><div id="commandtoolbar68" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(68)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(68)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n68">68</td>
+    <td><input name="command68" id="command68" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(88)" onmouseout="commandToolbarHide(88)"><div id="commandtoolbar88" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(88)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(88)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n88">88</td>
+    <td><input name="command88" id="command88" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(9)" onmouseout="commandToolbarHide(9)"><div id="commandtoolbar9" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(9)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(9)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n9">9</td>
+    <td><input name="command9" type="text" class="command" id="command9" tabindex="9" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(29)" onmouseout="commandToolbarHide(29)"><div id="commandtoolbar29" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(29)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(29)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n29">29</td>
+    <td><input name="command29" id="command29" tabindex="29" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(49)" onmouseout="commandToolbarHide(49)"><div id="commandtoolbar49" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(49)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(49)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n49">49</td>
+    <td><input name="command49" id="command49" tabindex="49" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(69)" onmouseout="commandToolbarHide(69)"><div id="commandtoolbar69" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(69)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(69)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n69">69</td>
+    <td><input name="command69" id="command69" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(89)" onmouseout="commandToolbarHide(89)"><div id="commandtoolbar89" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(89)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(89)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n89">89</td>
+    <td><input name="command89" id="command89" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(10)" onmouseout="commandToolbarHide(10)"><div id="commandtoolbar10" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(10)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(10)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n10">10</td>
+    <td><input name="command10" type="text" class="command" id="command10" tabindex="10" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(30)" onmouseout="commandToolbarHide(30)"><div id="commandtoolbar30" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(30)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(30)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n30">30</td>
+    <td><input name="command30" id="command30" tabindex="30" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(50)" onmouseout="commandToolbarHide(50)"><div id="commandtoolbar50" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(50)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(50)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n50">50</td>
+    <td><input name="command50" id="command50" tabindex="50" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(70)" onmouseout="commandToolbarHide(70)"><div id="commandtoolbar70" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(70)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(70)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n70">70</td>
+    <td><input name="command70" id="command70" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(90)" onmouseout="commandToolbarHide(90)"><div id="commandtoolbar90" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(90)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(90)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n90">90</td>
+    <td><input name="command90" id="command90" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(11)" onmouseout="commandToolbarHide(11)"><div id="commandtoolbar11" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(11)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(11)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n11">11</td>
+    <td><input name="command11" type="text" class="command" id="command11" tabindex="11" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(31)" onmouseout="commandToolbarHide(31)"><div id="commandtoolbar31" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(31)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(31)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n31">31</td>
+    <td><input name="command31" id="command31" tabindex="31" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(51)" onmouseout="commandToolbarHide(51)"><div id="commandtoolbar51" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(51)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(51)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n51">51</td>
+    <td><input name="command51" id="command51" tabindex="51" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(71)" onmouseout="commandToolbarHide(71)"><div id="commandtoolbar71" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(71)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(71)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n71">71</td>
+    <td><input name="command71" id="command71" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(91)" onmouseout="commandToolbarHide(91)"><div id="commandtoolbar91" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(91)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(91)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n91">91</td>
+    <td><input name="command91" id="command91" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(12)" onmouseout="commandToolbarHide(12)"><div id="commandtoolbar12" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(12)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(12)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n12">12</td>
+    <td><input name="command12" type="text" class="command" id="command12" tabindex="12" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(32)" onmouseout="commandToolbarHide(32)"><div id="commandtoolbar32" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(32)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(32)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n32">32</td>
+    <td><input name="command32" id="command32" tabindex="32" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(52)" onmouseout="commandToolbarHide(52)"><div id="commandtoolbar52" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(52)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(52)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n52">52</td>
+    <td><input name="command52" id="command52" tabindex="52" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(72)" onmouseout="commandToolbarHide(72)"><div id="commandtoolbar72" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(72)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(72)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n72">72</td>
+    <td><input name="command72" id="command72" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(92)" onmouseout="commandToolbarHide(92)"><div id="commandtoolbar92" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(92)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(92)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n92">92</td>
+    <td><input name="command92" id="command92" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(13)" onmouseout="commandToolbarHide(13)"><div id="commandtoolbar13" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(13)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(13)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n13">13</td>
+    <td><input name="command13" type="text" class="command" id="command13" tabindex="13" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(33)" onmouseout="commandToolbarHide(33)"><div id="commandtoolbar33" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(33)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(33)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n33">33</td>
+    <td><input name="command33" id="command33" tabindex="33" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(53)" onmouseout="commandToolbarHide(53)"><div id="commandtoolbar53" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(53)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(53)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n53">53</td>
+    <td><input name="command53" id="command53" tabindex="53" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(73)" onmouseout="commandToolbarHide(73)"><div id="commandtoolbar73" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(73)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(73)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n73">73</td>
+    <td><input name="command73" id="command73" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(93)" onmouseout="commandToolbarHide(93)"><div id="commandtoolbar93" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(93)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(93)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n93">93</td>
+    <td><input name="command93" id="command93" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(14)" onmouseout="commandToolbarHide(14)"><div id="commandtoolbar14" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(14)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(14)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n14">14</td>
+    <td><input name="command14" type="text" class="command" id="command14" tabindex="14" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(34)" onmouseout="commandToolbarHide(34)"><div id="commandtoolbar34" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(34)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(34)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n34">34</td>
+    <td><input name="command34" id="command34" tabindex="34" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(54)" onmouseout="commandToolbarHide(54)"><div id="commandtoolbar54" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(54)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(54)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n54">54</td>
+    <td><input name="command54" id="command54" tabindex="54" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(74)" onmouseout="commandToolbarHide(74)"><div id="commandtoolbar74" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(74)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(74)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n74">74</td>
+    <td><input name="command74" id="command74" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(94)" onmouseout="commandToolbarHide(94)"><div id="commandtoolbar94" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(94)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(94)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n94">94</td>
+    <td><input name="command94" id="command94" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(15)" onmouseout="commandToolbarHide(15)"><div id="commandtoolbar15" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(15)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(15)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n15">15</td>
+    <td><input name="command15" type="text" class="command" id="command15" tabindex="15" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(35)" onmouseout="commandToolbarHide(35)"><div id="commandtoolbar35" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(35)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(35)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n35">35</td>
+    <td><input name="command35" id="command35" tabindex="35" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(55)" onmouseout="commandToolbarHide(55)"><div id="commandtoolbar55" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(55)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(55)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n55">55</td>
+    <td><input name="command55" id="command55" tabindex="55" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(75)" onmouseout="commandToolbarHide(75)"><div id="commandtoolbar75" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(75)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(75)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n75">75</td>
+    <td><input name="command75" id="command75" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(95)" onmouseout="commandToolbarHide(95)"><div id="commandtoolbar95" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(95)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(95)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n95">95</td>
+    <td><input name="command95" id="command95" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(16)" onmouseout="commandToolbarHide(16)"><div id="commandtoolbar16" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(16)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(16)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n16">16</td>
+    <td><input name="command16" type="text" class="command" id="command16" tabindex="16" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(36)" onmouseout="commandToolbarHide(36)"><div id="commandtoolbar36" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(36)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(36)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n36">36</td>
+    <td><input name="command36" id="command36" tabindex="36" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(56)" onmouseout="commandToolbarHide(56)"><div id="commandtoolbar56" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(56)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(56)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n56">56</td>
+    <td><input name="command56" id="command56" tabindex="56" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(76)" onmouseout="commandToolbarHide(76)"><div id="commandtoolbar76" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(76)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(76)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n76">76</td>
+    <td><input name="command76" id="command76" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(96)" onmouseout="commandToolbarHide(96)"><div id="commandtoolbar96" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(96)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(96)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n96">96</td>
+    <td><input name="command96" id="command96" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(17)" onmouseout="commandToolbarHide(17)"><div id="commandtoolbar17" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(17)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(17)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n17">17</td>
+    <td><input name="command17" type="text" class="command" id="command17" tabindex="17" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(37)" onmouseout="commandToolbarHide(37)"><div id="commandtoolbar37" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(37)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(37)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n37">37</td>
+    <td><input name="command37" id="command37" tabindex="37" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(57)" onmouseout="commandToolbarHide(57)"><div id="commandtoolbar57" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(57)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(57)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n57">57</td>
+    <td><input name="command57" id="command57" tabindex="57" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(77)" onmouseout="commandToolbarHide(77)"><div id="commandtoolbar77" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(77)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(77)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n77">77</td>
+    <td><input name="command77" id="command77" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(97)" onmouseout="commandToolbarHide(97)"><div id="commandtoolbar97" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(97)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(97)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n97">97</td>
+    <td><input name="command97" id="command97" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(18)" onmouseout="commandToolbarHide(18)"><div id="commandtoolbar18" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(18)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(18)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n18">18</td>
+    <td><input name="command18" type="text" class="command" id="command18" tabindex="18" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(38)" onmouseout="commandToolbarHide(38)"><div id="commandtoolbar38" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(38)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(38)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n38">38</td>
+    <td><input name="command38" id="command38" tabindex="38" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(58)" onmouseout="commandToolbarHide(58)"><div id="commandtoolbar58" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(58)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(58)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n58">58</td>
+    <td><input name="command58" id="command58" tabindex="58" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(78)" onmouseout="commandToolbarHide(78)"><div id="commandtoolbar78" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(78)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(78)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n78">78</td>
+    <td><input name="command78" id="command78" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(98)" onmouseout="commandToolbarHide(98)"><div id="commandtoolbar98" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(98)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(98)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n98">98</td>
+    <td><input name="command98" id="command98" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(19)" onmouseout="commandToolbarHide(19)"><div id="commandtoolbar19" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(19)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(19)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n19">19</td>
+    <td><input name="command19" type="text" class="command" id="command19" tabindex="19" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(39)" onmouseout="commandToolbarHide(39)"><div id="commandtoolbar39" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(39)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(39)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n39">39</td>
+    <td><input name="command39" id="command39" tabindex="39" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(59)" onmouseout="commandToolbarHide(59)"><div id="commandtoolbar59" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(59)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(59)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n59">59</td>
+    <td><input name="command59" id="command59" tabindex="59" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(79)" onmouseout="commandToolbarHide(79)"><div id="commandtoolbar79" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(79)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(79)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n79">79</td>
+    <td><input name="command79" id="command79" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(99)" onmouseout="commandToolbarHide(99)"><div id="commandtoolbar99" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(99)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(99)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n99">99</td>
+    <td><input name="command99" id="command99" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+  <tr>
+    <td onmouseover="commandToolbarShow(20)" onmouseout="commandToolbarHide(20)"><div id="commandtoolbar20" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(20)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(20)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n20">20</td>
+    <td><input name="command20" type="text" class="command" id="command20" tabindex="20" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(40)" onmouseout="commandToolbarHide(40)"><div id="commandtoolbar40" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(40)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(40)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n40">40</td>
+    <td><input name="command40" id="command40" tabindex="40" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(60)" onmouseout="commandToolbarHide(60)"><div id="commandtoolbar60" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(60)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(60)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n60">60</td>
+    <td><input name="command60" id="command60" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(80)" onmouseout="commandToolbarHide(80)"><div id="commandtoolbar80" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(80)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(80)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n80">80</td>
+    <td><input name="command80" id="command80" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+    <td>&nbsp;</td>
+    <td onmouseover="commandToolbarShow(100)" onmouseout="commandToolbarHide(100)"><div id="commandtoolbar100" style="visibility:hidden"><img src="buttonClearLine.png" width="22" alt="Delete this line" title="Delete this line" onclick="deleteThisLine(100)" /><img src="buttonInsertAbove.png" width="22" alt="Insert empty line above" title="Insert empty line above" onclick="insertEmptyLineAbove(100)" /></div></td>
+    <td align="right" style="color:#d0d0d0" id="n100">100</td>
+    <td><input name="command100" id="command100" tabindex="60" type="text" class="command" maxlength="20" size="10" onchange="checkCommand(this)" onkeydown="return commandEntry(this,event)" /></td>
+  </tr>
+</table>
+</form>
+<script language="javascript" type="text/javascript">
+function doLoadProgram() {
+	if ( TrimAll(document.programLoader.programToLoad.value) == '' ) {
+		alert("Nothing to load!");
+		return;
+	}
+	// Parse entire program without loading to see if errors exist
+	var com = document.programLoader.programToLoad.value.split("\n");
+	for (i in com) {
+		com[i] = Trim(com[i]);
+		if ( com[i]=='' ) continue;
+		if ( com[i].search(/^\d+\s*:\s*\*/) != -1 ) continue; // Ingnore comments
+
+		com[i] = TrimAll(com[i]);
+		if ( com[i].indexOf(':')==-1) {
+			alert('Error:\n\nNo number found for command "' + com[i] + '"');
+			return;
+		}
+		if ( ! isUnsignedInteger(com[i].substr(0,com[i].indexOf(':')))) {
+			alert('Error:\n\nNot a valid command number at "' + com[i] + '"');
+			return;
+		}
+		var comNumber = Number(com[i].substr(0,com[i].indexOf(':')));
+		var comText = com[i].substr(com[i].indexOf(':')+1);
+		var com1 = parseCommand(comText);
+		// Returns directive, next1, next2, Error_Code, Error_Text
+		if ( com1[3] != 0 ) {
+			alert('Error:\n\n'+com1[4]);
+			return;
+		}
+		if ( comNumber < 1 ) {
+			alert('Error:\n\nSorry, command number ' + comNumber + 'cannot be loaded.\n\nCommand numbers should start at 1.');
+			return;
+		}
+		if ( comNumber > maxCommands ) {
+			alert('Error:\n\nSorry, command number ' + comNumber + 'cannot be loaded.\n\nCommand number is too high.\n\nThis version can only process '+maxCommands+' commands.');
+			return;
+		}
+	}
+
+	clearProgram();  // Clear current program to actually load new program
+	// Do everything again, without error messages
+	com = document.programLoader.programToLoad.value.split("\n");
+	for (i in com) {
+		com[i] = Trim(com[i]);
+		if ( com[i]=='' ) continue ;
+		if ( com[i].search(/^\d+\s*:\s*\*/) != -1 ) {
+			// Directive appears to be a comment; copy without modification
+		} else {
+			com[i] = TrimAll(com[i]).toUpperCase();
+		}
+		var comNumber = Number(com[i].substr(0,com[i].indexOf(':')));
+		var comText = Trim(com[i].substr(com[i].indexOf(':')+1));
+		document.getElementById('command'+comNumber).value = comText;
+		document.getElementById('n'+comNumber).style.color="black";
+	}
+	loadProgramHide();
+}
+function doCancelLoad() {
+	if ( TrimAll(document.programLoader.programToLoad.value)=='' || confirm("Close this window?") ) loadProgramHide();
+}
+
+</script>
+<div id="loadProgramFrame" style="visibility:hidden;z-index: 1; position: absolute; left: 100px; top: 50px; width:500px; height:500px; background-color:#FFF;border:1px solid #303030">
+<div id="loadProgramFrameHeader" style="background-color:#CCC">
+  <table width="100%" border="0">
+    <tr>
+      <td><strong>Load Window</strong></td>
+      <td align="right"><img src="buttonClose.png" width="30" alt="Close Loader" title="Close Loader" onclick="doCancelLoad()" /></td>
+    </tr>
+  </table></div>
+  <div id="loadProgramFrameBody" style="padding-left:40px">
+<h1>Load Program</h1>
+<form name="programLoader">
+<input type="button" value="Load" onclick="doLoadProgram()" title="Load the program below into the Post Automaton" />
+<input type="button" value="Clear" onclick="document.programLoader.programToLoad.value=''" title="Clear the entry field below" />
+<input type="button" value="Cancel" onclick="doCancelLoad()" title="Close thie Loader window" /><br />
+<textarea name="programToLoad" cols="20" rows="20"></textarea>
+</form>
+</div></div>
+</body>
+</html>

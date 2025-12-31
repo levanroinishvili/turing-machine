@@ -1,0 +1,179 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Help : Post Automaton Programming Syntax</title>
+</head>
+
+<body>
+<h1> Post Automaton</h1>
+<p>The Post Automaton consists of a  Film Strip and a Cursor. The Film Strip consists of frames, each of which can be either empty or full. The Cursos can move along the Film Strip and execute directives. Directives are numbered sequentially and written as a program.</p>
+<p align="center"><img src="help1.jpg" width="276" height="96" alt="Film Strip and the Cursor of a Post Automaton" title="Film Strip and the Cursor of a Post Automaton" /><br /><font size="-1">
+<strong>Pic 1.</strong> Film Strip and the Cursor of a Post Automaton</font></p>
+<p>After you write the program, use the buttons under the Film Strip to execute and debug the program.<br /><img src="help3.jpg" width="223" height="40" alt="Execute and debug program with these buttons." title="Execute and debug program with these buttons." /></p>
+<p> You can also export and import programs, and view this help by using these buttons.<br /><img src="help4.jpg" width="148" height="40" alt="Export or import program and access this help with these buttons." title="Export or import program and access this help with these buttons." /></p>
+<h2>Programming Directives</h2>
+<table>
+  <tr>
+    <th height="30">Short Name</th>
+    <th>&nbsp;</th>
+    <th>Full Name</th>
+    <th>&nbsp;</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td align="center">L</td>
+    <td align="center">&nbsp;</td>
+    <td align="center">LEFT</td>
+    <td align="center">&nbsp;</td>
+    <td>Move the Cursor left</td>
+  </tr>
+  <tr>
+    <td align="center">R</td>
+    <td align="center">&nbsp;</td>
+    <td align="center">RIGHT</td>
+    <td align="center">&nbsp;</td>
+    <td>Move the Cursor right</td>
+  </tr>
+  <tr>
+    <td align="center">E</td>
+    <td align="center">&nbsp;</td>
+    <td align="center">EVALUATE</td>
+    <td align="center">&nbsp;</td>
+    <td>Evaluate the frame under cursor.</td>
+  </tr>
+  <tr>
+    <td align="center">1</td>
+    <td align="center">&nbsp;</td>
+    <td align="center">&nbsp;</td>
+    <td align="center">&nbsp;</td>
+    <td>Write to the frame under the Cursor. If the cell is already written, error occurs.</td>
+  </tr>
+  <tr>
+    <td align="center">0</td>
+    <td align="center">&nbsp;</td>
+    <td align="center">&nbsp;</td>
+    <td align="center">&nbsp;</td>
+    <td>Empty the frame under the Cursos. If the cell is already empty, error occurs.</td>
+  </tr>
+  <tr>
+    <td align="center">S</td>
+    <td align="center">&nbsp;</td>
+    <td align="center">STOP</td>
+    <td align="center">&nbsp;</td>
+    <td>Stop program</td>
+  </tr>
+</table>
+<h2>&nbsp;</h2>
+<h2>Examples</h2>
+<table border="0" cellspacing="0">
+  <tr>
+    <td align="right" bgcolor="#dddddd">&nbsp;</td>
+    <td align="right" bgcolor="#dddddd"><strong> #</strong></td>
+    <td align="center" bgcolor="#dddddd">&nbsp;</td>
+    <td align="center" nowrap="nowrap" bgcolor="#dddddd"><strong>Full Text</strong></td>
+    <td align="center" bgcolor="#dddddd">&nbsp;</td>
+    <td align="center" bgcolor="#dddddd"><strong>Explanation</strong></td>
+    <td width="30" align="center" bgcolor="#dddddd">&nbsp;</td>
+    <td align="center" bgcolor="#dddddd">&nbsp;</td>
+    <td align="center" bgcolor="#dddddd">#</td>
+    <td align="center" nowrap="nowrap" bgcolor="#dddddd">&nbsp;</td>
+    <td align="center" nowrap="nowrap" bgcolor="#dddddd">&nbsp;&nbsp;<strong>Short Text</strong>&nbsp;&nbsp;</td>
+    <td align="center" bgcolor="#dddddd">&nbsp;</td>
+    <td align="center" bgcolor="#dddddd"><strong>Explanation</strong></td>
+  </tr>
+  <tr>
+    <td align="right" bgcolor="#f5f5f5">&nbsp;</td>
+    <td align="right" bgcolor="#f5f5f5">1&nbsp;</td>
+    <td>&nbsp;</td>
+    <td nowrap="nowrap">RIGHT-2</td>
+    <td>&nbsp;</td>
+    <td>Move Cursor right. Then execute directive #2.</td>
+    <td>&nbsp;</td>
+    <td bgcolor="#f5f5f5">&nbsp;</td>
+    <td bgcolor="#f5f5f5">1&nbsp;</td>
+    <td nowrap="nowrap">&nbsp;</td>
+    <td nowrap="nowrap">R</td>
+    <td>&nbsp;</td>
+    <td>Move Cursor right. Then execute the next directive.</td>
+  </tr>
+  <tr>
+    <td align="right" bgcolor="#f5f5f5">&nbsp;</td>
+    <td align="right" bgcolor="#f5f5f5">2&nbsp;</td>
+    <td>&nbsp;</td>
+    <td nowrap="nowrap">EVALUATE-3-1</td>
+    <td>&nbsp;</td>
+    <td>If the frame under  Cursor is already written, execute directive #3. Otherwise execute directive #1.</td>
+    <td>&nbsp;</td>
+    <td bgcolor="#f5f5f5">&nbsp;</td>
+    <td bgcolor="#f5f5f5">2&nbsp;</td>
+    <td nowrap="nowrap">&nbsp;</td>
+    <td nowrap="nowrap">E-3-1</td>
+    <td>&nbsp;</td>
+    <td>The &quot;E&quot; directive always needs both addresses. If one or both are omited, results will be undefined.</td>
+  </tr>
+  <tr>
+    <td align="right" bgcolor="#f5f5f5">&nbsp;</td>
+    <td align="right" bgcolor="#f5f5f5">3&nbsp;</td>
+    <td>&nbsp;</td>
+    <td nowrap="nowrap">0-4</td>
+    <td>&nbsp;</td>
+    <td>Empty the frame under  Cursor. Then execute directive #4.</td>
+    <td>&nbsp;</td>
+    <td bgcolor="#f5f5f5">&nbsp;</td>
+    <td bgcolor="#f5f5f5">3&nbsp;</td>
+    <td nowrap="nowrap">&nbsp;</td>
+    <td nowrap="nowrap">0</td>
+    <td>&nbsp;</td>
+    <td>Empty the frame under  Cursor. Then execute the next directive.</td>
+  </tr>
+  <tr>
+    <td align="right" bgcolor="#f5f5f5">&nbsp;</td>
+    <td align="right" bgcolor="#f5f5f5">4&nbsp;</td>
+    <td>&nbsp;</td>
+    <td nowrap="nowrap">RIGHT-5</td>
+    <td>&nbsp;</td>
+    <td>Move Cursos right. Then execute directive #5.</td>
+    <td>&nbsp;</td>
+    <td bgcolor="#f5f5f5">&nbsp;</td>
+    <td bgcolor="#f5f5f5">4&nbsp;</td>
+    <td nowrap="nowrap">&nbsp;</td>
+    <td nowrap="nowrap">R</td>
+    <td>&nbsp;</td>
+    <td>Move Cursos right. Then execute the next directive.</td>
+  </tr>
+  <tr>
+    <td align="right" bgcolor="#f5f5f5">&nbsp;</td>
+    <td align="right" bgcolor="#f5f5f5">5&nbsp;</td>
+    <td>&nbsp;</td>
+    <td nowrap="nowrap">1-6</td>
+    <td>&nbsp;</td>
+    <td>Write to the frame under  Cursos. Then execute directive #6.</td>
+    <td>&nbsp;</td>
+    <td bgcolor="#f5f5f5">&nbsp;</td>
+    <td bgcolor="#f5f5f5">5&nbsp;</td>
+    <td nowrap="nowrap">&nbsp;</td>
+    <td nowrap="nowrap">1</td>
+    <td>&nbsp;</td>
+    <td>Write to the frame under  Cursos. Then execute the next directive.</td>
+  </tr>
+  <tr>
+    <td align="right" bgcolor="#f5f5f5">&nbsp;</td>
+    <td align="right" bgcolor="#f5f5f5">6&nbsp;</td>
+    <td>&nbsp;</td>
+    <td nowrap="nowrap">STOP</td>
+    <td>&nbsp;</td>
+    <td>Stop program execution.</td>
+    <td>&nbsp;</td>
+    <td bgcolor="#f5f5f5">&nbsp;</td>
+    <td bgcolor="#f5f5f5">6&nbsp;</td>
+    <td nowrap="nowrap">&nbsp;</td>
+    <td nowrap="nowrap">STOP</td>
+    <td>&nbsp;</td>
+    <td>Stop program execution.</td>
+  </tr>
+</table>
+<pre>&nbsp;</pre>
+<p>&nbsp;</p>
+</body>
+</html>
